@@ -1,0 +1,4 @@
+agent-framework
+agent-framework-foundry
+agent-framework-foundry-hosting
+python-dotenv>=1.0.0

@@ -1,0 +1,3 @@
+git+https://github.com/Azure/azure-sdk-for-python.git@feature/enable-a365-tracing#subdirectory=sdk/agentserver/azure-ai-agentserver-core
+git+https://github.com/Azure/azure-sdk-for-python.git@feature/enable-a365-tracing#subdirectory=sdk/agentserver/azure-ai-agentserver-invocations
+git+https://github.com/Azure/azure-sdk-for-python.git@feature/enable-a365-tracing#subdirectory=sdk/agentserver/azure-ai-agentserver-responses
