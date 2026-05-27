@@ -3,6 +3,7 @@ using EchoAgent;
 using Microsoft.Agents.Builder;
 using Microsoft.Agents.Hosting.AspNetCore;
 using Microsoft.Agents.Storage;
+using Microsoft.Extensions.Http;
 using Microsoft.OpenTelemetry;
 using OpenTelemetry;
 using OpenTelemetry.Logs;
@@ -17,6 +18,14 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IStorage, MemoryStorage>();
 builder.AddAgentApplicationOptions();
 builder.AddAgent<EchoAgentApplication>();
+
+// Register the export logging handler to intercept A365 exporter HTTP calls
+builder.Services.AddTransient<ExportLoggingHandler>();
+builder.Services.ConfigureAll<HttpClientFactoryOptions>(options =>
+{
+    options.HttpMessageHandlerBuilderActions.Add(b =>
+        b.AdditionalHandlers.Add(b.Services.GetRequiredService<ExportLoggingHandler>()));
+});
 
 // Telemetry configuration
 var appInsightsConnStr = Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
@@ -73,6 +82,7 @@ if (!string.IsNullOrEmpty(appInsightsConnStr) || a365Enabled)
             // Disable sampling so all requests (and their logs) are exported
             tracing.SetSampler(new AlwaysOnSampler());
             tracing.AddProcessor(new FoundryEnrichmentProcessor());
+            tracing.AddConsoleExporter();
             tracing.AddSource(
                 EchoAgentApplication.TelemetrySourceName,
                 "EchoAgent",
@@ -135,14 +145,34 @@ app.Use(next => context =>
 app.MapPost("/api/messages", async (HttpContext httpContext, HttpRequest request, HttpResponse response, IAgentHttpAdapter adapter, IAgent agent, CancellationToken cancellationToken) =>
 {
     request.EnableBuffering();
-    // Store the HTTP request activity context (TraceId+SpanId) so the OnActivity handler
-    // can re-parent its spans under the incoming request, even though HttpContext won't
-    // be available on the background async context where MAF processes the turn.
+
+    // Log all incoming request headers
+    logger.LogInformation("[/api/messages] === Request Headers ===");
+    foreach (var header in request.Headers)
+    {
+        logger.LogInformation("[/api/messages] {Key}: {Value}", header.Key, header.Value.ToString());
+    }
+    logger.LogInformation("[/api/messages] === End Headers ===");
+
     var current = System.Diagnostics.Activity.Current;
     if (current != null)
     {
+        // Add user.id as baggage so it propagates to all child spans (including MAF spans)
+        current.AddBaggage("user.id", "fd50db2c-2ab7-415d-8f1d-2e66a7c71e54");
+
+        logger.LogInformation("[/api/messages] Activity.Current: {DisplayName}, TraceId={TraceId}, SpanId={SpanId}",
+            current.DisplayName, current.TraceId, current.SpanId);
+        foreach (var bag in current.Baggage)
+        {
+            logger.LogInformation("[/api/messages] Baggage: {Key}={Value}", bag.Key, bag.Value);
+        }
         EchoAgent.RequestContextHolder.LastContext = current.Context;
     }
+    else
+    {
+        logger.LogWarning("[/api/messages] Activity.Current is NULL");
+    }
+
     await adapter.ProcessAsync(request, response, agent, cancellationToken);
 });
 
