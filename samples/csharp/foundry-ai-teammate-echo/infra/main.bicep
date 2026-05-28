@@ -42,7 +42,7 @@ param maibName string = '${agentName}-maib'
 // =================================================================================================
 
 @description('Name of the Bot Service')
-param botName string = '${agentName}-bot-echo'
+param botName string = 'echo-bot-${uniqueString(subscription().subscriptionId, environmentName)}'
 
 @description('Display name of the bot')
 param botDisplayName string = '${agentName} Echo Bot'
@@ -51,7 +51,7 @@ param botDisplayName string = '${agentName} Echo Bot'
 param botServiceSku string = 'F0'
 
 @description('Model name')
-param modelName string = 'gpt-chat-latest'
+param modelName string = 'gpt-chat-latest-1'
 
 @description('Model version')
 param modelVersion string = '2026-05-05'

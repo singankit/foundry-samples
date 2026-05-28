@@ -24,7 +24,7 @@ public class EchoAgentApplication : AgentApplication
         var endpoint = Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT")
             ?? throw new InvalidOperationException("FOUNDRY_PROJECT_ENDPOINT is not set.");
         var modelDeployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME")
-            ?? "gpt-chat-latest";
+            ?? "gpt-chat-latest-1";
         var agentName = Environment.GetEnvironmentVariable("FOUNDRY_AGENT_NAME") ?? "echo-agent";
         var agentVersion = Environment.GetEnvironmentVariable("FOUNDRY_AGENT_VERSION");
         var agentId = Environment.GetEnvironmentVariable("FOUNDRY_AGENT_INSTANCE_CLIENT_ID");
