@@ -20,6 +20,8 @@ var searchEndpoint = new Uri(Environment.GetEnvironmentVariable("AZURE_SEARCH_EN
     ?? throw new InvalidOperationException("AZURE_SEARCH_ENDPOINT environment variable is not set."));
 var indexName = Environment.GetEnvironmentVariable("AZURE_SEARCH_INDEX_NAME") ?? "contoso-outdoors";
 
+const string SourceName = "AzureSearchRag.AgentFramework";
+
 var credential = new DefaultAzureCredential();
 
 // The index is expected to exist and be populated before the agent runs. See README.md for the
@@ -45,7 +47,10 @@ AIAgent agent = new AIProjectClient(projectEndpoint, credential)
                            "If you cannot find relevant information in the provided context, let the customer know.",
         },
         AIContextProviders = [new TextSearchProvider(CreateSearchAdapter(searchClient), textSearchOptions)]
-    });
+    })
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+    .Build();
 
 var builder = AgentHost.CreateBuilder(args);
 builder.Services.AddFoundryResponses(agent);

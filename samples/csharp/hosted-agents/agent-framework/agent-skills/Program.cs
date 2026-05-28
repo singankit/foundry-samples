@@ -59,6 +59,8 @@ var projectEndpoint = new Uri(Environment.GetEnvironmentVariable("FOUNDRY_PROJEC
 string deployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME")
     ?? throw new InvalidOperationException("AZURE_AI_MODEL_DEPLOYMENT_NAME environment variable is not set.");
 
+const string SourceName = "AgentSkills.AgentFramework";
+
 // SKILL_NAMES is optional. CI environments that don't pass sample-specific manifest
 // parameters will leave it unset (or as the literal "{{SKILL_NAMES}}" placeholder).
 // In that case the agent still starts up and responds, just without any skills wired
@@ -135,8 +137,14 @@ ChatClientAgent agent = projectClient.AsAIAgent(new ChatClientAgentOptions
     AIContextProviders = skillsProvider is null ? [] : [skillsProvider],
 });
 
+// Wrap agent for end-to-end OpenTelemetry tracing.
+var instrumentedAgent = agent
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+    .Build();
+
 var builder = AgentHost.CreateBuilder(args);
-builder.Services.AddFoundryResponses(agent);
+builder.Services.AddFoundryResponses(instrumentedAgent);
 builder.RegisterProtocol("responses", endpoints => endpoints.MapFoundryResponses());
 
 var app = builder.Build();

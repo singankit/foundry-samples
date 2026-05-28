@@ -14,6 +14,8 @@ var projectEndpoint = new Uri(Environment.GetEnvironmentVariable("FOUNDRY_PROJEC
     ?? throw new InvalidOperationException("FOUNDRY_PROJECT_ENDPOINT environment variable is not set."));
 var deployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME") ?? "gpt-4o";
 
+const string SourceName = "TextSearchRag.AgentFramework";
+
 AIAgent agent = new AIProjectClient(projectEndpoint, new DefaultAzureCredential())
     .AsAIAgent(
         model: deployment,
@@ -25,11 +27,18 @@ AIAgent agent = new AIProjectClient(projectEndpoint, new DefaultAzureCredential(
             """,
         name: "text-search-rag",
         description: "A RAG-powered customer support assistant with text search capabilities",
+        clientFactory: inner => inner
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+            .Build(),
         tools:
         [
             AIFunctionFactory.Create(SearchKnowledgeBase, "SearchKnowledgeBase",
                 "Searches the company knowledge base for relevant information about products, policies, and procedures.")
-        ]);
+        ])
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+    .Build();
 
 var builder = AgentHost.CreateBuilder(args);
 builder.Services.AddFoundryResponses(agent);

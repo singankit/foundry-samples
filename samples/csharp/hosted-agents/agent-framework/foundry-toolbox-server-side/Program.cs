@@ -22,6 +22,7 @@ using Azure.Identity;
 using DotNetEnv;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Foundry.Hosting;
+using Microsoft.Extensions.AI;
 
 // Load .env file if present (for local development)
 Env.TraversePath().Load();
@@ -34,6 +35,8 @@ var deployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_N
 
 var toolboxName = Environment.GetEnvironmentVariable("TOOLBOX_NAME")
     ?? throw new InvalidOperationException("TOOLBOX_NAME environment variable is not set.");
+
+const string SourceName = "FoundryToolboxServerSide.AgentFramework";
 
 // Fetch the toolbox's tools from Foundry. Omitting the version resolves the toolbox's
 // current default version. The returned AITools are passed directly to the agent as
@@ -48,7 +51,14 @@ AIAgent agent = projectClient
                     + "Use the available tools to help answer user questions. Be concise.",
         name: "foundry-toolbox-server-side",
         description: "Agent with Foundry Toolbox integration using server-side tools.",
-        tools: [.. tools]);
+        clientFactory: inner => inner
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+            .Build(),
+        tools: [.. tools])
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+    .Build();
 
 var builder = AgentHost.CreateBuilder(args);
 builder.Services.AddFoundryResponses(agent);

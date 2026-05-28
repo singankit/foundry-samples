@@ -27,6 +27,8 @@ var deployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_N
 var embeddingDeployment = Environment.GetEnvironmentVariable("AZURE_AI_EMBEDDING_DEPLOYMENT_NAME") ?? "text-embedding-3-small";
 var memoryStoreName = Environment.GetEnvironmentVariable("AZURE_AI_MEMORY_STORE_ID") ?? "foundry-memory-rag-store";
 
+const string SourceName = "FoundryMemoryRag.AgentFramework";
+
 var projectClient = new AIProjectClient(projectEndpoint, new DefaultAzureCredential());
 
 // Per-user memory scoping is the production pattern. This sample uses a single shared scope
@@ -61,8 +63,13 @@ var agent = projectClient.AsAIAgent(new ChatClientAgentOptions
     AIContextProviders = [memoryProvider]
 });
 
+var instrumentedAgent = agent
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+    .Build();
+
 var builder = AgentHost.CreateBuilder(args);
-builder.Services.AddFoundryResponses(agent);
+builder.Services.AddFoundryResponses(instrumentedAgent);
 builder.RegisterProtocol("responses", endpoints => endpoints.MapFoundryResponses());
 
 var app = builder.Build();

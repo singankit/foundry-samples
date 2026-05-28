@@ -41,6 +41,7 @@ using Azure.AI.Projects;
 using Azure.Identity;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Foundry.Hosting;
+using Microsoft.Extensions.AI;
 
 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING")))
 {
@@ -56,6 +57,8 @@ var projectEndpoint = new Uri(Environment.GetEnvironmentVariable("FOUNDRY_PROJEC
 var deployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME")
     ?? throw new InvalidOperationException("AZURE_AI_MODEL_DEPLOYMENT_NAME environment variable is not set.");
 
+const string SourceName = "HelloWorld.AgentFramework";
+
 // Create an AIAgent backed by a Foundry model.
 // The agent framework manages the LLM call, conversation sessions, and response lifecycle.
 AIAgent agent = new AIProjectClient(projectEndpoint, new DefaultAzureCredential())
@@ -63,7 +66,14 @@ AIAgent agent = new AIProjectClient(projectEndpoint, new DefaultAzureCredential(
         model: deployment,
         instructions: "You are a helpful AI assistant. Be concise and informative.",
         name: "hello-world",
-        description: "A minimal Hello World agent using the Agent Framework");
+        description: "A minimal Hello World agent using the Agent Framework",
+        clientFactory: inner => inner
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+            .Build())
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+    .Build();
 
 // AgentHost.CreateBuilder() auto-configures:
 //   - Kestrel on port 8088 (or the PORT environment variable)

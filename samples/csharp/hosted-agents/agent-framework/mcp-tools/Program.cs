@@ -31,6 +31,8 @@ var projectEndpoint = new Uri(Environment.GetEnvironmentVariable("FOUNDRY_PROJEC
     ?? throw new InvalidOperationException("FOUNDRY_PROJECT_ENDPOINT environment variable is not set."));
 var deployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME") ?? "gpt-4o";
 
+const string SourceName = "McpTools.AgentFramework";
+
 // ── Client-side MCP: Microsoft Learn (local resolution) ──────────────────────
 // Connect directly to the MCP server. The agent discovers and invokes tools locally.
 Console.WriteLine("Connecting to Microsoft Learn MCP server (client-side)...");
@@ -70,7 +72,14 @@ AIAgent agent = new AIProjectClient(projectEndpoint, new DefaultAzureCredential(
             """,
         name: "mcp-tools",
         description: "Developer assistant with dual-layer MCP tools (client-side and server-side)",
-        tools: allTools);
+        clientFactory: inner => inner
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+            .Build(),
+        tools: allTools)
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+    .Build();
 
 var builder = AgentHost.CreateBuilder(args);
 builder.Services.AddFoundryResponses(agent);

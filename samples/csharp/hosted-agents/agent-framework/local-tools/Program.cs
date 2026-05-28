@@ -14,6 +14,8 @@ var projectEndpoint = new Uri(Environment.GetEnvironmentVariable("FOUNDRY_PROJEC
     ?? throw new InvalidOperationException("FOUNDRY_PROJECT_ENDPOINT environment variable is not set."));
 var deployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME") ?? "gpt-4o";
 
+const string SourceName = "LocalTools.AgentFramework";
+
 AIAgent agent = new AIProjectClient(projectEndpoint, new DefaultAzureCredential())
     .AsAIAgent(
         model: deployment,
@@ -24,11 +26,18 @@ AIAgent agent = new AIProjectClient(projectEndpoint, new DefaultAzureCredential(
             """,
         name: "local-tools",
         description: "A hotel concierge assistant with local function tools",
+        clientFactory: inner => inner
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+            .Build(),
         tools:
         [
             AIFunctionFactory.Create(GetAvailableHotels, "GetAvailableHotels",
                 "Gets a list of available hotels in Seattle with details about amenities and pricing.")
-        ]);
+        ])
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+    .Build();
 
 var builder = AgentHost.CreateBuilder(args);
 builder.Services.AddFoundryResponses(agent);

@@ -16,6 +16,8 @@ var projectEndpoint = new Uri(Environment.GetEnvironmentVariable("FOUNDRY_PROJEC
 
 var deployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME") ?? "gpt-4.1-mini";
 
+const string SourceName = "FileTools.AgentFramework";
+
 // Bundled root: files copied into the published output via csproj <Content Include="resources\**">.
 // In the container this resolves to /app/resources/.
 string bundledRoot = Path.GetFullPath(
@@ -48,13 +50,20 @@ AIAgent agent = new AIProjectClient(projectEndpoint, new DefaultAzureCredential(
             """,
         name: "file-tools",
         description: "Hosted agent that answers questions over bundled (image-baked) and session-uploaded files via two scoped tool pairs.",
+        clientFactory: inner => inner
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+            .Build(),
         tools:
         [
             AIFunctionFactory.Create(ListBundledFiles),
             AIFunctionFactory.Create(ReadBundledFile),
             AIFunctionFactory.Create(ListSessionFiles),
             AIFunctionFactory.Create(ReadSessionFile),
-        ]);
+        ])
+    .AsBuilder()
+    .UseOpenTelemetry(sourceName: SourceName, configure: c => c.EnableSensitiveData = true)
+    .Build();
 
 var builder = AgentHost.CreateBuilder(args);
 builder.Services.AddFoundryResponses(agent);
