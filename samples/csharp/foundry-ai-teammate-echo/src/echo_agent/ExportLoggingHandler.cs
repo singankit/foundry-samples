@@ -29,12 +29,10 @@ internal sealed class ExportLoggingHandler : DelegatingHandler
             if (request.Content != null)
             {
                 var body = await request.Content.ReadAsStringAsync(cancellationToken);
-                // Log in chunks of 80000 chars
-                for (int i = 0; i < body.Length; i += 80000)
-                {
-                    var chunk = body.Substring(i, Math.Min(80000, body.Length - i));
-                    _logger.LogInformation("[A365 Export] Body[{Offset}]: {Chunk}", i, chunk);
-                }
+                _logger.LogInformation("[A365 Export] Body: {Body}", body);
+                // Replace the content so the stream can be re-read by the HTTP client
+                request.Content = new StringContent(body, System.Text.Encoding.UTF8,
+                    request.Content.Headers.ContentType?.MediaType ?? "application/json");
             }
         }
 
