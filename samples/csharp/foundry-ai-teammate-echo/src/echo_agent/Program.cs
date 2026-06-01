@@ -157,9 +157,6 @@ app.MapPost("/api/messages", async (HttpContext httpContext, HttpRequest request
     var current = System.Diagnostics.Activity.Current;
     if (current != null)
     {
-        // Add user.id as baggage so it propagates to all child spans (including MAF spans)
-        current.AddBaggage("user.id", "fd50db2c-2ab7-415d-8f1d-2e66a7c71e54");
-
         logger.LogInformation("[/api/messages] Activity.Current: {DisplayName}, TraceId={TraceId}, SpanId={SpanId}",
             current.DisplayName, current.TraceId, current.SpanId);
         foreach (var bag in current.Baggage)

@@ -124,7 +124,5 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
             activity.SetTag("microsoft.session.id", _sessionId);
         }
 
-        // Hardcoded user.id for testing
-        activity.SetTag("user.id", "fd50db2c-2ab7-415d-8f1d-2e66a7c71e54");
     }
 }
