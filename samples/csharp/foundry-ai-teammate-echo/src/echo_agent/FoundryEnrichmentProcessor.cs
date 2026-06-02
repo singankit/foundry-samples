@@ -71,21 +71,22 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
             }
         }
 
-        // Also set well-known semantic attributes from baggage
-        var sessionId = activity.GetBaggageItem("azure.ai.agentserver.session_id");
+        // Also set well-known semantic attributes from baggage.
+        // Use Baggage.Current (OTel async-context) so values propagate to child spans too.
+        var sessionId = Baggage.Current.GetBaggage("azure.ai.agentserver.session_id");
         if (!string.IsNullOrWhiteSpace(sessionId))
         {
             activity.SetTag("microsoft.session.id", sessionId);
         }
 
-        var conversationId = activity.GetBaggageItem("azure.ai.agentserver.conversation_id");
+        var conversationId = Baggage.Current.GetBaggage("azure.ai.agentserver.conversation_id");
         if (!string.IsNullOrWhiteSpace(conversationId))
         {
             activity.SetTag("gen_ai.conversation.id", conversationId);
         }
 
-        var userId = activity.GetBaggageItem("user.id");
-        _logger.LogInformation("[FoundryEnrichment] user.id baggage lookup on span '{SpanName}': '{UserId}'", activity.DisplayName, userId ?? "<null>");
+        var userId = Baggage.Current.GetBaggage("user.id");
+        _logger.LogInformation("[FoundryEnrichment] user.id Baggage.Current lookup on span '{SpanName}': '{UserId}'", activity.DisplayName, userId ?? "<null>");
         if (!string.IsNullOrWhiteSpace(userId))
         {
             activity.SetTag("user.id", userId);
