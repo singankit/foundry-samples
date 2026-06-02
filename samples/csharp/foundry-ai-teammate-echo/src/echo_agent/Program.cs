@@ -164,6 +164,18 @@ app.MapPost("/api/messages", async (HttpContext httpContext, HttpRequest request
         {
             logger.LogInformation("[/api/messages] Baggage: {Key}={Value}", bag.Key, bag.Value);
         }
+
+        // Push Activity baggage entries into Baggage.Current (OTel async-local) so
+        // Baggage.Current.GetBaggage() works in the processor for all child spans.
+        // Activity.Baggage is populated by the ASP.NET Core OTel instrumentation from
+        // incoming HTTP headers, but Baggage.Current is a separate store that must be
+        // set explicitly.
+        foreach (var bag in current.Baggage)
+        {
+            if (!string.IsNullOrWhiteSpace(bag.Value))
+                OpenTelemetry.Baggage.SetBaggage(bag.Key, bag.Value);
+        }
+
         EchoAgent.RequestContextHolder.LastContext = current.Context;
     }
     else
