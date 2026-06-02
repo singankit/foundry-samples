@@ -14,7 +14,9 @@
           image = "$($AzureContainerRegistryEndpoint)/echo-agent:latest"
           cpu = "2"
           memory = "4Gi"
-          environment_variables = @{}
+          environment_variables = @{
+              FOUNDRY_USER_ID = "bc2272ed-465f-4fbc-a1a5-4eade7574da2"
+          }
           container_protocol_versions = @(
               @{
                   protocol = "activity_protocol"

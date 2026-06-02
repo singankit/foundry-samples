@@ -124,5 +124,10 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
             activity.SetTag("microsoft.session.id", _sessionId);
         }
 
+        var userId = Environment.GetEnvironmentVariable("FOUNDRY_USER_ID");
+        if (!string.IsNullOrEmpty(userId))
+        {
+            activity.SetTag("user.id", userId);
+        }
     }
 }
