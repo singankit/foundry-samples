@@ -9,6 +9,7 @@ using OpenTelemetry;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
+using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -147,28 +148,16 @@ app.MapPost("/api/messages", async (HttpContext httpContext, HttpRequest request
 {
     request.EnableBuffering();
 
-    // Log all incoming request headers
-    logger.LogInformation("[/api/messages] === Request Headers ===");
-    foreach (var header in request.Headers)
-    {
-        logger.LogInformation("[/api/messages] {Key}: {Value}", header.Key, header.Value.ToString());
-    }
-    logger.LogInformation("[/api/messages] === End Headers ===");
-
     var current = System.Diagnostics.Activity.Current;
     if (current != null)
     {
-        logger.LogInformation("[/api/messages] Activity.Current: {DisplayName}, TraceId={TraceId}, SpanId={SpanId}",
-            current.DisplayName, current.TraceId, current.SpanId);
-        foreach (var bag in current.Baggage)
-        {
-            logger.LogInformation("[/api/messages] Baggage: {Key}={Value}", bag.Key, bag.Value);
-        }
+        // Log the full baggage string at debug level for diagnostics
+        var baggageStr = string.Join(",", current.Baggage.Select(b => $"{b.Key}={b.Value}"));
+        logger.LogInformation("[/api/messages] baggage: {Baggage}", baggageStr);
 
-        // Push Activity baggage entries into Baggage.Current (OTel async-local) so
-        // Baggage.Current.GetBaggage() works in the processor for all child spans.
-        // Activity.Baggage is populated from incoming HTTP headers, but Baggage.Current
-        // is immutable and must be rebuilt and assigned explicitly.
+        // Sync Activity.Baggage (populated from incoming W3C baggage header by OTel
+        // ASP.NET Core instrumentation) into Baggage.Current (OTel AsyncLocal) so that
+        // GenAI spans within the bot turn can read it via Baggage.Current.GetBaggage().
         var updatedBaggage = OpenTelemetry.Baggage.Current;
         foreach (var bag in current.Baggage)
         {
@@ -176,8 +165,6 @@ app.MapPost("/api/messages", async (HttpContext httpContext, HttpRequest request
                 updatedBaggage = updatedBaggage.SetBaggage(bag.Key, bag.Value);
         }
         OpenTelemetry.Baggage.Current = updatedBaggage;
-        logger.LogInformation("[/api/messages] Baggage.Current set, user.id={UserId}",
-            OpenTelemetry.Baggage.Current.GetBaggage("user.id"));
 
         EchoAgent.RequestContextHolder.LastContext = current.Context;
     }

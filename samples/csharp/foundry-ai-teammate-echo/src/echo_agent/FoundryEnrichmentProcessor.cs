@@ -60,9 +60,9 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
             activity.SetTag("microsoft.foundry.project.id", _projectId);
         }
 
-        // Log and stamp ALL baggage entries as span tags
-        var baggage = activity.Baggage;
-        foreach (var entry in baggage)
+        // Stamp all incoming baggage entries as span tags on the root HTTP span.
+        // For child spans, rely on Baggage.Current (set below) which flows via AsyncLocal.
+        foreach (var entry in activity.Baggage)
         {
             if (!string.IsNullOrWhiteSpace(entry.Value))
             {
@@ -71,8 +71,12 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
             }
         }
 
-        // Also set well-known semantic attributes from baggage.
-        // Use Baggage.Current (OTel async-context) so values propagate to child spans too.
+        // Stamp well-known semantic attributes from Baggage.Current.
+        // Following the A365 ActivityProcessor pattern, Baggage.Current is reliably
+        // available for GenAI operation spans (process_turn, chat, invoke_agent, etc.)
+        // which run inside the bot turn. Infrastructure spans (HttpRequestOut,
+        // DefaultAzureCredential.GetToken) may run on threads that predate our baggage
+        // scope and are intentionally skipped — consistent with A365 behavior.
         var sessionId = Baggage.Current.GetBaggage("azure.ai.agentserver.session_id");
         if (!string.IsNullOrWhiteSpace(sessionId))
         {
@@ -86,10 +90,10 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
         }
 
         var userId = Baggage.Current.GetBaggage("user.id");
-        _logger.LogInformation("[FoundryEnrichment] user.id Baggage.Current lookup on span '{SpanName}': '{UserId}'", activity.DisplayName, userId ?? "<null>");
         if (!string.IsNullOrWhiteSpace(userId))
         {
             activity.SetTag("user.id", userId);
+            _logger.LogInformation("[FoundryEnrichment] Set user.id on span '{SpanName}'", activity.DisplayName);
         }
     }
 
