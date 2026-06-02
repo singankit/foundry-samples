@@ -16,6 +16,7 @@ builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IStorage, MemoryStorage>();
+builder.Services.AddSingleton<FoundryEnrichmentProcessor>();
 builder.AddAgentApplicationOptions();
 builder.AddAgent<EchoAgentApplication>();
 
@@ -81,7 +82,7 @@ if (!string.IsNullOrEmpty(appInsightsConnStr) || a365Enabled)
         {
             // Disable sampling so all requests (and their logs) are exported
             tracing.SetSampler(new AlwaysOnSampler());
-            tracing.AddProcessor(new FoundryEnrichmentProcessor());
+            tracing.AddProcessor<FoundryEnrichmentProcessor>();
             tracing.AddConsoleExporter();
             tracing.AddSource(
                 EchoAgentApplication.TelemetrySourceName,

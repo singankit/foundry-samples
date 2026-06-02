@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 
 namespace EchoAgent;
@@ -12,6 +13,7 @@ namespace EchoAgent;
 /// </summary>
 internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
 {
+    private readonly ILogger<FoundryEnrichmentProcessor> _logger;
     private readonly string? _agentName;
     private readonly string? _agentVersion;
     private readonly string? _agentId;
@@ -21,8 +23,9 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
     private readonly string? _agentType;
     private readonly string? _sessionId;
 
-    public FoundryEnrichmentProcessor()
+    public FoundryEnrichmentProcessor(ILogger<FoundryEnrichmentProcessor> logger)
     {
+        _logger = logger;
         _agentName = Environment.GetEnvironmentVariable("FOUNDRY_AGENT_NAME");
         _agentVersion = Environment.GetEnvironmentVariable("FOUNDRY_AGENT_VERSION");
         _projectId = Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ARM_ID");
@@ -63,7 +66,7 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
         {
             if (!string.IsNullOrWhiteSpace(entry.Value))
             {
-                Console.WriteLine($"[FoundryEnrichment] Baggage: {entry.Key} = {entry.Value}");
+                _logger.LogInformation("[FoundryEnrichment] Baggage: {Key} = {Value}", entry.Key, entry.Value);
                 activity.SetTag($"baggage.{entry.Key}", entry.Value);
             }
         }
@@ -82,7 +85,7 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
         }
 
         var userId = activity.GetBaggageItem("user.id");
-        Console.WriteLine($"[FoundryEnrichment] user.id baggage lookup on span '{activity.DisplayName}': '{userId ?? "<null>"}'");
+        _logger.LogInformation("[FoundryEnrichment] user.id baggage lookup on span '{SpanName}': '{UserId}'", activity.DisplayName, userId ?? "<null>");
         if (!string.IsNullOrWhiteSpace(userId))
         {
             activity.SetTag("user.id", userId);
