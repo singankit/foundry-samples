@@ -80,6 +80,12 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
         {
             activity.SetTag("gen_ai.conversation.id", conversationId);
         }
+
+        var userId = activity.GetBaggageItem("user.id");
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            activity.SetTag("user.id", userId);
+        }
     }
 
     /// <inheritdoc/>
@@ -122,12 +128,6 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
         if (!string.IsNullOrEmpty(_sessionId))
         {
             activity.SetTag("microsoft.session.id", _sessionId);
-        }
-
-        var userId = Environment.GetEnvironmentVariable("APP_USER_ID");
-        if (!string.IsNullOrEmpty(userId))
-        {
-            activity.SetTag("user.id", userId);
         }
     }
 }
