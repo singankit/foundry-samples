@@ -82,6 +82,7 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
         }
 
         var userId = activity.GetBaggageItem("user.id");
+        Console.WriteLine($"[FoundryEnrichment] user.id baggage lookup on span '{activity.DisplayName}': '{userId ?? "<null>"}'");
         if (!string.IsNullOrWhiteSpace(userId))
         {
             activity.SetTag("user.id", userId);
