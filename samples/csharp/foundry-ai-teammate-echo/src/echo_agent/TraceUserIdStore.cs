@@ -20,12 +20,19 @@ internal sealed class TraceUserIdStore
     private static readonly ConcurrentDictionary<ActivityTraceId, string> _store = new();
 
     /// <summary>Records the user.id for the given trace.</summary>
-    public void Set(ActivityTraceId traceId, string userId) =>
+    public void Set(ActivityTraceId traceId, string userId)
+    {
         _store[traceId] = userId;
+        Console.WriteLine($"[TraceUserIdStore.Set] TraceId={traceId} userId={userId} storeCount={_store.Count} instanceId={GetHashCode()} staticDictId={_store.GetHashCode()}");
+    }
 
     /// <summary>Returns the user.id for the given trace, or null if not found.</summary>
-    public string? Get(ActivityTraceId traceId) =>
-        _store.TryGetValue(traceId, out var userId) ? userId : null;
+    public string? Get(ActivityTraceId traceId)
+    {
+        var found = _store.TryGetValue(traceId, out var userId);
+        Console.WriteLine($"[TraceUserIdStore.Get] TraceId={traceId} found={found} userId={userId ?? "<null>"} storeCount={_store.Count} instanceId={GetHashCode()} staticDictId={_store.GetHashCode()}");
+        return found ? userId : null;
+    }
 
     /// <summary>Removes the entry when the root span ends to avoid memory leaks.</summary>
     public void Remove(ActivityTraceId traceId) =>
