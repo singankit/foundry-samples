@@ -14,6 +14,7 @@ namespace EchoAgent;
 internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
 {
     private readonly ILogger<FoundryEnrichmentProcessor> _logger;
+    private readonly TraceUserIdStore _userIdStore;
     private readonly string? _agentName;
     private readonly string? _agentVersion;
     private readonly string? _agentId;
@@ -23,9 +24,10 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
     private readonly string? _agentType;
     private readonly string? _sessionId;
 
-    public FoundryEnrichmentProcessor(ILogger<FoundryEnrichmentProcessor> logger)
+    public FoundryEnrichmentProcessor(ILogger<FoundryEnrichmentProcessor> logger, TraceUserIdStore userIdStore)
     {
         _logger = logger;
+        _userIdStore = userIdStore;
         _agentName = Environment.GetEnvironmentVariable("FOUNDRY_AGENT_NAME");
         _agentVersion = Environment.GetEnvironmentVariable("FOUNDRY_AGENT_VERSION");
         _projectId = Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ARM_ID");
@@ -89,7 +91,12 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
             activity.SetTag("gen_ai.conversation.id", conversationId);
         }
 
-        var userId = Baggage.Current.GetBaggage("user.id");
+        // Stamp user.id on every span in this trace using the TraceId-keyed store.
+        // This is reliable for all span types — including infrastructure spans
+        // (HttpRequestOut, DefaultAzureCredential.GetToken) that run on background
+        // threads where Baggage.Current is not propagated.
+        var userId = _userIdStore.Get(activity.TraceId)
+                     ?? Baggage.Current.GetBaggage("user.id"); // fallback for in-turn spans
         if (!string.IsNullOrWhiteSpace(userId))
         {
             activity.SetTag("user.id", userId);
@@ -101,9 +108,15 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
     /// <remarks>
     /// Agent identity tags are set in OnEnd so they take precedence over
     /// any values an underlying framework may have stamped during the span's lifetime.
+    /// Root spans also clean up the TraceUserIdStore entry.
     /// </remarks>
     public override void OnEnd(Activity activity)
     {
+        // Clean up TraceUserIdStore for root spans to prevent memory leaks.
+        if (activity.Parent is null)
+        {
+            _userIdStore.Remove(activity.TraceId);
+        }
         if (_agentName is not null)
         {
             activity.SetTag("gen_ai.agent.name", _agentName);

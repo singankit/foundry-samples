@@ -17,6 +17,7 @@ builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IStorage, MemoryStorage>();
+builder.Services.AddSingleton<TraceUserIdStore>();
 builder.Services.AddSingleton<FoundryEnrichmentProcessor>();
 builder.AddAgentApplicationOptions();
 builder.AddAgent<EchoAgentApplication>();
@@ -144,7 +145,7 @@ app.Use(next => context =>
     return next(context);
 });
 
-app.MapPost("/api/messages", async (HttpContext httpContext, HttpRequest request, HttpResponse response, IAgentHttpAdapter adapter, IAgent agent, CancellationToken cancellationToken) =>
+app.MapPost("/api/messages", async (HttpContext httpContext, HttpRequest request, HttpResponse response, IAgentHttpAdapter adapter, IAgent agent, TraceUserIdStore traceUserIdStore, CancellationToken cancellationToken) =>
 {
     request.EnableBuffering();
 
@@ -155,9 +156,7 @@ app.MapPost("/api/messages", async (HttpContext httpContext, HttpRequest request
         var baggageStr = string.Join(",", current.Baggage.Select(b => $"{b.Key}={b.Value}"));
         logger.LogInformation("[/api/messages] baggage: {Baggage}", baggageStr);
 
-        // Sync Activity.Baggage (populated from incoming W3C baggage header by OTel
-        // ASP.NET Core instrumentation) into Baggage.Current (OTel AsyncLocal) so that
-        // GenAI spans within the bot turn can read it via Baggage.Current.GetBaggage().
+        // Sync Activity.Baggage into Baggage.Current for GenAI spans within the bot turn.
         var updatedBaggage = OpenTelemetry.Baggage.Current;
         foreach (var bag in current.Baggage)
         {
@@ -165,6 +164,16 @@ app.MapPost("/api/messages", async (HttpContext httpContext, HttpRequest request
                 updatedBaggage = updatedBaggage.SetBaggage(bag.Key, bag.Value);
         }
         OpenTelemetry.Baggage.Current = updatedBaggage;
+
+        // Store user.id keyed by TraceId so FoundryEnrichmentProcessor can stamp it
+        // on ALL spans in this trace — including infrastructure spans that run on
+        // background threads where Baggage.Current is not reliably propagated.
+        var userId = current.GetBaggageItem("user.id");
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            traceUserIdStore.Set(current.TraceId, userId);
+            logger.LogInformation("[/api/messages] Stored user.id in TraceUserIdStore for TraceId={TraceId}", current.TraceId);
+        }
 
         EchoAgent.RequestContextHolder.LastContext = current.Context;
     }
