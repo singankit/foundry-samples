@@ -63,7 +63,6 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
         }
 
         // Stamp all incoming baggage entries as span tags on the root HTTP span.
-        // For child spans, rely on Baggage.Current (set below) which flows via AsyncLocal.
         foreach (var entry in activity.Baggage)
         {
             if (!string.IsNullOrWhiteSpace(entry.Value))
@@ -73,35 +72,20 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
             }
         }
 
-        // Stamp well-known semantic attributes from Baggage.Current.
-        // Following the A365 ActivityProcessor pattern, Baggage.Current is reliably
-        // available for GenAI operation spans (process_turn, chat, invoke_agent, etc.)
-        // which run inside the bot turn. Infrastructure spans (HttpRequestOut,
-        // DefaultAzureCredential.GetToken) may run on threads that predate our baggage
-        // scope and are intentionally skipped — consistent with A365 behavior.
         var sessionId = Baggage.Current.GetBaggage("azure.ai.agentserver.session_id");
         if (!string.IsNullOrWhiteSpace(sessionId))
-        {
             activity.SetTag("microsoft.session.id", sessionId);
-        }
 
         var conversationId = Baggage.Current.GetBaggage("azure.ai.agentserver.conversation_id");
         if (!string.IsNullOrWhiteSpace(conversationId))
-        {
             activity.SetTag("gen_ai.conversation.id", conversationId);
-        }
 
-        // Stamp user.id on every span in this trace using the TraceId-keyed store.
-        // This is reliable for all span types — including infrastructure spans
-        // (HttpRequestOut, DefaultAzureCredential.GetToken) that run on background
-        // threads where Baggage.Current is not propagated.
         var userId = _userIdStore.Get(activity.TraceId)
-                     ?? Baggage.Current.GetBaggage("user.id"); // fallback for in-turn spans
+                     ?? Baggage.Current.GetBaggage("user.id");
+        _logger.LogInformation("[FoundryEnrichment][OnStart] span='{SpanName}' TraceId={TraceId} userId='{UserId}'",
+            activity.DisplayName, activity.TraceId, userId ?? "<null>");
         if (!string.IsNullOrWhiteSpace(userId))
-        {
             activity.SetTag("user.id", userId);
-            _logger.LogInformation("[FoundryEnrichment] Set user.id on span '{SpanName}'", activity.DisplayName);
-        }
     }
 
     /// <inheritdoc/>
@@ -112,10 +96,10 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
         // For root spans, read before removing from the store.
         var userId = _userIdStore.Get(activity.TraceId)
                      ?? Baggage.Current.GetBaggage("user.id");
+        _logger.LogInformation("[FoundryEnrichment][OnEnd] span='{SpanName}' TraceId={TraceId} userId='{UserId}'",
+            activity.DisplayName, activity.TraceId, userId ?? "<null>");
         if (!string.IsNullOrWhiteSpace(userId))
-        {
             activity.SetTag("user.id", userId);
-        }
 
         // Clean up TraceUserIdStore for root spans to prevent memory leaks.
         if (activity.Parent is null)
