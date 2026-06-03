@@ -11,10 +11,13 @@ namespace EchoAgent;
 /// it on every span in the trace — including infrastructure spans (HttpRequestOut,
 /// DefaultAzureCredential.GetToken) that run on thread-pool threads where
 /// Baggage.Current is not reliably propagated.
+///
+/// The backing store is static to ensure all instances (including any created by
+/// the OTel pipeline outside of the DI container) share the same data.
 /// </summary>
 internal sealed class TraceUserIdStore
 {
-    private readonly ConcurrentDictionary<ActivityTraceId, string> _store = new();
+    private static readonly ConcurrentDictionary<ActivityTraceId, string> _store = new();
 
     /// <summary>Records the user.id for the given trace.</summary>
     public void Set(ActivityTraceId traceId, string userId) =>
