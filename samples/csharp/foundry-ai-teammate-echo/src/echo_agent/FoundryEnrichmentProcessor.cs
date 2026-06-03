@@ -105,18 +105,24 @@ internal sealed class FoundryEnrichmentProcessor : BaseProcessor<Activity>
     }
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// Agent identity tags are set in OnEnd so they take precedence over
-    /// any values an underlying framework may have stamped during the span's lifetime.
-    /// Root spans also clean up the TraceUserIdStore entry.
-    /// </remarks>
     public override void OnEnd(Activity activity)
     {
+        // Stamp user.id in OnEnd to cover spans whose OnStart fired before the store
+        // was populated (e.g. HttpRequestIn starts before the /api/messages handler runs).
+        // For root spans, read before removing from the store.
+        var userId = _userIdStore.Get(activity.TraceId)
+                     ?? Baggage.Current.GetBaggage("user.id");
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            activity.SetTag("user.id", userId);
+        }
+
         // Clean up TraceUserIdStore for root spans to prevent memory leaks.
         if (activity.Parent is null)
         {
             _userIdStore.Remove(activity.TraceId);
         }
+
         if (_agentName is not null)
         {
             activity.SetTag("gen_ai.agent.name", _agentName);
